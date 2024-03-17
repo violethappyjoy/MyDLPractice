@@ -1,3 +1,3 @@
-#**Custom Deep Learning Library**
+# **Custom Deep Learning Library**
 
 DL methodologies from scratch using numpy only.

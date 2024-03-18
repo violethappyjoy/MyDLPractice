@@ -64,4 +64,50 @@ class Decoder(nn.Module):
         
         return out, hidden
     
-class EncDec
+class EncDec(nn.Module):
+    '''
+        Encoder Decoder model for Many-to-Many RNN
+    '''
+    def __init__(self, encoder, decoder, npred):
+        '''
+        Arguments
+        encoder -- RNN for encoder
+        decoder -- RNN for decoder
+        npred -- Number of points to predict
+        '''
+        super(EncDec, self).__init__()
+        
+        self.enc   = encoder
+        self.dec   = decoder
+        self.npred = npred
+        
+    def forward(self, x):
+        '''
+        Arguments
+        x -- input of shape sequence, batch_siz
+        '''
+        local_batch_size = x.shape[1]
+        target_len = self.npred
+        
+        input_batch = x.unsqueeze(2)
+        
+        outs = torch.zeros(target_len, local_batch_size, 
+                           input_batch.shape[2], device=x.device)
+        
+        enc_hid = self.enc(input_batch)
+        
+        dec_in = input_batch[-1, :, :]
+        
+        dec_hid = enc_hid
+        
+        # make prediction like a traditional RNN point-by-point
+        #         by using the predicted point as new input
+        for t in range(target_len):
+            # note that the dec_hid is being continuously rewritten
+            dec_out, dec_hid = self.dec(dec_in, dec_hid)
+            # store the prediction
+            outs[t] = dec_out
+            # feed back the prediction as input to the decoder
+            dec_in =  dec_out
+            
+        return outs.reshape(target_len, local_batch_size)

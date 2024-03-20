@@ -44,11 +44,11 @@ class Decoder(nn.Module):
         self.num_layers = num_layers
         self.node_type = node_type
         
-        if flavor=='rnn':
+        if node_type=='rnn':
             self.rnn = nn.RNN(input_size, hidden_size, num_layers)
-        elif flavor=='lstm':
+        elif node_type=='lstm':
             self.rnn = nn.LSTM(input_size, hidden_size, num_layers)
-        elif flavor=='gru':
+        elif node_type=='gru':
             self.rnn = nn.GRU(input_size, hidden_size, num_layers)
             
         self.linear = nn.Linear(hidden_size, input_size)

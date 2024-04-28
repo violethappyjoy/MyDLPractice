@@ -2,24 +2,30 @@ import torch
 import torch.nn as nn
 
 class Encoder(nn.Module):
-    def __init__(self, input_size, hidden_size, num_layers, node_type):
+    def __init__(self, input_size, embed_size=300, hidden_size=512, num_layers=1, node_type = 'gru', dropout_p=0.1):
         super(Encoder, self).__init__()
         
         self.input_size = input_size
+        self.embed_size = embed_size
         self.hidden_size = hidden_size
         self.num_layers = num_layers
         self.node_type = node_type
         
+        self.embedding = nn.Embedding(input_size, embed_size)
+        self.dropout = nn.Dropout(dropout_p)
+        
         if node_type=='rnn':
-            self.rnn = nn.RNN(input_size, hidden_size, num_layers)
+            self.rnn = nn.RNN(embed_size, hidden_size, num_layers, batch_first=True)
         elif node_type=='lstm':
-            self.rnn = nn.LSTM(input_size, hidden_size, num_layers)
+            self.rnn = nn.LSTM(embed_size, hidden_size, num_layers, batch_first=True)
         elif node_type=='gru':
-            self.rnn = nn.GRU(input_size, hidden_size, num_layers)
+            self.rnn = nn.GRU(embed_size, hidden_size, num_layers, batch_first=True)
             
     def forward(self, x):
         # gather weights in a contiguous memory location for 
         # more efficient processing
+        x = self.embedding(x)
+        x = self.dropout(x)
         self.rnn.flatten_parameters()
         
         h0 = torch.zeros(self.num_layers, x.size(1), 
@@ -36,31 +42,37 @@ class Encoder(nn.Module):
         return hidden
     
 class Decoder(nn.Module):
-    def __init__(self, input_size, hidden_size, num_layers, node_type):
+    def __init__(self, input_size, embed_size=300, hidden_size=512, num_layers=1, node_type = 'gru'):
         super(Decoder, self).__init__()
         
         self.input_size = input_size
+        self.embed_size = embed_size
         self.hidden_size = hidden_size
         self.num_layers = num_layers
         self.node_type = node_type
         
+        self.embedding = nn.Embedding(input_size, embed_size)
+        self.lsmax = nn.LogSoftmax(dim=1)
+        
         if node_type=='rnn':
-            self.rnn = nn.RNN(input_size, hidden_size, num_layers)
+            self.rnn = nn.RNN(embed_size, hidden_size, num_layers)
         elif node_type=='lstm':
-            self.rnn = nn.LSTM(input_size, hidden_size, num_layers)
+            self.rnn = nn.LSTM(embed_size, hidden_size, num_layers)
         elif node_type=='gru':
-            self.rnn = nn.GRU(input_size, hidden_size, num_layers)
+            self.rnn = nn.GRU(embed_size, hidden_size, num_layers)
             
         self.linear = nn.Linear(hidden_size, input_size)
         
     def forward(self, x, encoder_hidden):
         # gather weights in a contiguous memory location for 
         # more efficient processing
+        x = self.embedding(x)
         self.rnn.flatten_parameters()
         
         out, hidden = self.rnn(x.unsqueeze(0), encoder_hidden)
         
         out = self.linear(out.squeeze(0))
+        out = self.lsmax(out)
         
         return out, hidden
     

@@ -22,23 +22,11 @@ class Encoder(nn.Module):
             self.rnn = nn.GRU(embed_size, hidden_size, num_layers, batch_first=True)
             
     def forward(self, x):
-        # gather weights in a contiguous memory location for 
+        # gather weights in a contiguous memory location for
         # more efficient processing
         x = self.embedding(x)
         x = self.dropout(x)
-        self.rnn.flatten_parameters()
-        
-        h0 = torch.zeros(self.num_layers, x.size(1), 
-                        self.hidden_size, device=x.device)
-        
-        if self.node_type == 'lstm':
-            c0 = torch.zeros_like(h0)
-            _, hidden = self.rnn(x.view(x.shape[0], x.shape[1], 
-                                    self.input_size), (h0,c0))
-        else:
-            _, hidden = self.rnn(x.view(x.shape[0], x.shape[1], 
-                                    self.input_size), h0)
-        
+        _, hidden = self.rnn(x)
         return hidden
     
 class Decoder(nn.Module):
@@ -52,14 +40,15 @@ class Decoder(nn.Module):
         self.node_type = node_type
         
         self.embedding = nn.Embedding(input_size, embed_size)
-        self.lsmax = nn.LogSoftmax(dim=1)
+        self.relu=nn.ReLU()
+        self.lsmax = nn.LogSoftmax(dim=-1)
         
         if node_type=='rnn':
             self.rnn = nn.RNN(embed_size, hidden_size, num_layers)
         elif node_type=='lstm':
             self.rnn = nn.LSTM(embed_size, hidden_size, num_layers)
         elif node_type=='gru':
-            self.rnn = nn.GRU(embed_size, hidden_size, num_layers)
+            self.rnn = nn.GRU(embed_size, hidden_size, num_layers, batch_first=True)
             
         self.linear = nn.Linear(hidden_size, input_size)
         
@@ -67,11 +56,12 @@ class Decoder(nn.Module):
         # gather weights in a contiguous memory location for 
         # more efficient processing
         x = self.embedding(x)
-        self.rnn.flatten_parameters()
+        x=self.relu(x)
+        # self.rnn.flatten_parameters()
+        out, hidden = self.rnn(x, encoder_hidden)
+        # out, hidden = self.rnn(x.unsqueeze(0), encoder_hidden)
         
-        out, hidden = self.rnn(x.unsqueeze(0), encoder_hidden)
-        
-        out = self.linear(out.squeeze(0))
+        out = self.linear(out)
         out = self.lsmax(out)
         
         return out, hidden
